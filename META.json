@@ -24,14 +24,14 @@
             "Tk" : 0
          },
          "requires" : {
-            "perl" : "v5.6.2"
+            "perl" : "v5.8.1"
          }
       }
    },
    "provides" : {
       "App::makebeamerinfo" : {
          "file" : "lib/App/makebeamerinfo.pm",
-         "version" : "2.000"
+         "version" : "2.001"
       },
       "App::makebeamerinfo::CLI" : {
          "file" : "lib/App/makebeamerinfo/CLI.pm",
@@ -51,5 +51,5 @@
          "url" : "http://github.com/jberger/MakeBeamerInfo"
       }
    },
-   "version" : "2.000"
+   "version" : "2.001"
 }
