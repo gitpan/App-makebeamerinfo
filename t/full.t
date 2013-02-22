@@ -2,15 +2,13 @@ use strict;
 use warnings;
 
 use Test::More;
-use File::Temp ();
 
 use App::makebeamerinfo;
 
 #================
 # Create some temporary files
 
-my $nav = File::Temp->new( SUFFIX => '.nav' );
-print $nav <<'NAV';
+my $nav = <<'NAV';
 \beamer@endinputifotherversion {3.10pt}
 \headcommand {\slideentry {0}{0}{1}{1/1}{}{0}}
 \headcommand {\beamer@framepages {1}{1}}
@@ -28,10 +26,8 @@ print $nav <<'NAV';
 \headcommand {\beamer@documentpages {5}}
 \headcommand {\def \inserttotalframenumber {3}}
 NAV
-seek($nav, 0, 0);
 
-my $good_info = File::Temp->new( SUFFIX => '.pdf.info' );
-print $good_info <<'INFO';
+my $turn_info = <<'INFO';
 PageProps = {
   1:	{
 	  'title': "Title",
@@ -54,32 +50,76 @@ PageProps = {
 }
 AvailableTransitions = [WipeRight]
 INFO
-seek($good_info, 0, 0);
 
 #========================
 # Tests
 
-my $app = App::makebeamerinfo->new( nav => "$nav" );
+my $app = App::makebeamerinfo->new;
 isa_ok( $app, 'App::makebeamerinfo' );
 
-$app->readNav;
+{
+  # this should prevent cross platform newline problems when reading the test doc above
+  local $/ = '
+';
+
+  open my $nav_handle, '<', \$nav or die "Cannot open scalar for reading: $!";
+  $app->readNav($nav_handle);
+}
 
 ok( values %{ $app->{pages} }, "Found pages" );
 ok( values %{ $app->{sections} }, "Found sections" );
 
-my $info = File::Temp->new();
-$app->writeInfo($info);
-seek($info, 0, 0);
+#=====================
+# Test default set
 
-my $i = 0;
-while(my $good_line = <$good_info>) {
-  chomp $good_line;
+is $app->transition_set, 'default', 'Default to correct set (default)';
 
-  my $test_line = <$info>;
-  chomp $test_line;
-
-  is( $test_line, $good_line, "Files equal line: " . ++$i );
+my $output = '';
+{
+  open my $output_handle, '>', \$output or die "Cannot open scalar for writing: $!";
+  $app->writeInfo($output_handle);
 }
+
+unlike( $output, qr/transition/, 'Default set does not emit transition statments' );
+unlike( $output, qr/AvailableTransitions/, 'Default set does not emit AvailableTransitions' );
+
+#=====================
+# Test 'none' set
+
+$app->transition_set( 'none' );
+
+$output = '';
+{
+  open my $output_handle, '>', \$output or die "Cannot open scalar for writing: $!";
+  $app->writeInfo($output_handle);
+}
+
+unlike( $output, qr/transition/, q{'none' set does not emit transition statments} );
+like( $output, qr/AvailableTransitions\s*=\s*[\s*None\s*]/, q{'none' AvailableTransitions is only 'None'} );
+
+#=================
+# Test turn set
+
+$app->transition_set('turn');
+
+$output = '';
+{
+  open my $output_handle, '>', \$output or die "Cannot open scalar for writing: $!";
+  $app->writeInfo($output_handle);
+}
+
+# remove confusing vertical whitespace
+$output    =~ s/[\r\n]//g;
+$turn_info =~ s/[\r\n]//g;
+
+is( $output, $turn_info, 'Output as expected' );
+
+#===================
+# Other tests
+
+eval { $app->transition_set('does_not_exist') };
+ok( $@, 'Selecting unknown transition set dies' );
+like( $@, qr/Unknown transition set/, 'Error message' );
 
 done_testing;
 
